@@ -5,6 +5,7 @@ const path = require('path')
 const { error } = require('console')
 const { rejects } = require('assert')
 const { resolve } = require('path')
+const mime = require('mime')
 
 /**
  * this function is blocking, fix that
@@ -22,12 +23,20 @@ const findAsset = (name) => {
       }
     })
   })
-
 }
 
 const hostname = '127.0.0.1'
 const port = 3000
-
+const router = {
+  '/ GET': {
+    asset: 'index.html',
+    type: mime.getType('html')
+  },
+  '/style.css GET': {
+    asset: 'style.css',
+    type: mime.getType('css')
+  }
+}
 
 
 // log incoming request coming into the server. Helpful for debugging and tracking
@@ -36,27 +45,18 @@ const logRequest = (method, route, status) => console.log(method, route, status)
 const server = http.createServer(async (req, res) => {
   const method = req.method
   const route = req.url
-  console.log('responding to request for the path ' + route)
-  // this is sloppy, especially with more assets, create a "router"
-  if (route === '/') {
-    res.writeHead(200, { 'Content-Type': 'text/html' })
-    res.write(await findAsset('index.html'))
-    logRequest(method, route, 200)
-    res.end()
-  } else if (route === '/style.css') {
-    res.writeHead(200, { 'Content-Type': 'text/css' })
-    res.write(await findAsset('style.css'))
-    logRequest(method, route, 200)
-    res.end()
-  } else {
-    // missing asset should not cause server crash
-    // throw new Error('route not found')
+  const match = router[`${route} ${method}`]
+
+  if (!match) {
     res.writeHead(404)
-    // res.write("<h1>File not found</h1>")
     logRequest(method, route, 404)
-    res.end()
+    return res.end()
   }
-  // most important part, send down the asset
+
+  res.writeHead(200, { 'Content-Type': match.type })
+  res.write(await findAsset(match.asset))
+  logRequest(method, route, 200)
+  res.end()
 })
 
 server.listen(port, hostname, () => {
